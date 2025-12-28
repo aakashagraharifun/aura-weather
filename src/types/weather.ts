@@ -11,6 +11,8 @@ export type WeatherCondition =
 export interface CurrentWeather {
   location: string;
   country: string;
+  lat: number;
+  lon: number;
   temperature: number;
   feelsLike: number;
   condition: WeatherCondition;

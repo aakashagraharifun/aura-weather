@@ -30,6 +30,8 @@ const parseWeatherData = (current: any, forecast: any): WeatherData => {
   const currentWeather = {
     location: current.name,
     country: current.sys.country,
+    lat: current.coord.lat,
+    lon: current.coord.lon,
     temperature: Math.round(current.main.temp),
     feelsLike: Math.round(current.main.feels_like),
     condition: mapWeatherCondition(current.weather[0].icon, current.weather[0].id),
