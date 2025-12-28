@@ -21,6 +21,7 @@ export interface CurrentWeather {
   visibility: number;
   uvIndex: number;
   isDay: boolean;
+  icon: string;
 }
 
 export interface HourlyForecast {
@@ -29,6 +30,7 @@ export interface HourlyForecast {
   condition: WeatherCondition;
   conditionText: string;
   precipChance: number;
+  icon: string;
 }
 
 export interface DailyForecast {
@@ -39,6 +41,7 @@ export interface DailyForecast {
   condition: WeatherCondition;
   conditionText: string;
   precipChance: number;
+  icon: string;
 }
 
 export interface WeatherData {
@@ -48,3 +51,19 @@ export interface WeatherData {
 }
 
 export type TemperatureUnit = 'celsius' | 'fahrenheit';
+
+export interface CitySearchResult {
+  name: string;
+  country: string;
+  state: string;
+  lat: number;
+  lon: number;
+}
+
+export interface FavoriteCity {
+  id: string;
+  name: string;
+  country: string;
+  lat: number;
+  lon: number;
+}

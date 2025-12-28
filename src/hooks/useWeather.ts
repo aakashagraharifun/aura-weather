@@ -1,87 +1,97 @@
 import { useState, useCallback } from 'react';
-import type { WeatherData, WeatherCondition } from '@/types/weather';
+import { supabase } from '@/integrations/supabase/client';
+import type { WeatherData, WeatherCondition, CitySearchResult } from '@/types/weather';
 
-// Mock weather data generator
-const generateMockWeather = (city: string): WeatherData => {
-  const conditions: WeatherCondition[] = ['sunny', 'cloudy', 'rainy', 'thunderstorm', 'snow'];
-  const conditionTexts: Record<WeatherCondition, string> = {
-    sunny: 'Clear Sky',
-    cloudy: 'Partly Cloudy',
-    rainy: 'Light Rain',
-    thunderstorm: 'Thunderstorm',
-    snow: 'Light Snow',
-    night: 'Clear Night',
-    'night-cloudy': 'Cloudy Night',
-    mist: 'Misty',
+// Map OpenWeatherMap icon codes to our weather conditions
+const mapWeatherCondition = (iconCode: string, weatherId: number): WeatherCondition => {
+  const isNight = iconCode.endsWith('n');
+  
+  // Thunderstorm (200-299)
+  if (weatherId >= 200 && weatherId < 300) return 'thunderstorm';
+  // Drizzle & Rain (300-599)
+  if (weatherId >= 300 && weatherId < 600) return 'rainy';
+  // Snow (600-699)
+  if (weatherId >= 600 && weatherId < 700) return 'snow';
+  // Atmosphere/Mist (700-799)
+  if (weatherId >= 700 && weatherId < 800) return 'mist';
+  // Clear (800)
+  if (weatherId === 800) return isNight ? 'night' : 'sunny';
+  // Clouds (801-804)
+  if (weatherId > 800) return isNight ? 'night-cloudy' : 'cloudy';
+  
+  return isNight ? 'night' : 'sunny';
+};
+
+const parseWeatherData = (current: any, forecast: any): WeatherData => {
+  const now = new Date();
+  const isDay = current.weather[0].icon.endsWith('d');
+  
+  // Parse current weather
+  const currentWeather = {
+    location: current.name,
+    country: current.sys.country,
+    temperature: Math.round(current.main.temp),
+    feelsLike: Math.round(current.main.feels_like),
+    condition: mapWeatherCondition(current.weather[0].icon, current.weather[0].id),
+    conditionText: current.weather[0].description.charAt(0).toUpperCase() + current.weather[0].description.slice(1),
+    humidity: current.main.humidity,
+    windSpeed: Math.round(current.wind.speed * 3.6), // m/s to km/h
+    pressure: current.main.pressure,
+    visibility: Math.round((current.visibility || 10000) / 1000), // meters to km
+    uvIndex: 0, // Not available in free API
+    isDay,
+    icon: current.weather[0].icon,
   };
 
-  const hour = new Date().getHours();
-  const isDay = hour >= 6 && hour < 20;
-  
-  // Randomize based on city name for variety
-  const seed = city.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const conditionIndex = seed % conditions.length;
-  let condition = conditions[conditionIndex];
-  
-  // Adjust for night time
-  if (!isDay && condition === 'sunny') {
-    condition = 'night';
-  } else if (!isDay && condition === 'cloudy') {
-    condition = 'night-cloudy';
-  }
-
-  const baseTemp = 15 + (seed % 20);
-  
-  const hourlyData: WeatherData['hourly'] = Array.from({ length: 24 }, (_, i) => {
-    const forecastHour = (hour + i) % 24;
-    const isForecastDay = forecastHour >= 6 && forecastHour < 20;
-    let hourCondition = conditions[(conditionIndex + Math.floor(i / 6)) % conditions.length];
-    
-    if (!isForecastDay && hourCondition === 'sunny') {
-      hourCondition = 'night';
-    }
-    
+  // Parse hourly forecast (3-hour intervals from forecast API)
+  const hourlyData = forecast.list.slice(0, 8).map((item: any) => {
+    const time = new Date(item.dt * 1000);
     return {
-      time: `${forecastHour.toString().padStart(2, '0')}:00`,
-      temperature: Math.round(baseTemp + Math.sin(forecastHour / 3) * 5),
-      condition: hourCondition,
-      conditionText: conditionTexts[hourCondition],
-      precipChance: Math.round(Math.random() * 100),
+      time: time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+      temperature: Math.round(item.main.temp),
+      condition: mapWeatherCondition(item.weather[0].icon, item.weather[0].id),
+      conditionText: item.weather[0].description,
+      precipChance: Math.round((item.pop || 0) * 100),
+      icon: item.weather[0].icon,
     };
   });
 
+  // Parse daily forecast (group by day)
+  const dailyMap = new Map<string, any[]>();
+  forecast.list.forEach((item: any) => {
+    const date = new Date(item.dt * 1000).toISOString().split('T')[0];
+    if (!dailyMap.has(date)) {
+      dailyMap.set(date, []);
+    }
+    dailyMap.get(date)!.push(item);
+  });
+
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const dailyData: WeatherData['daily'] = Array.from({ length: 5 }, (_, i) => {
-    const date = new Date();
-    date.setDate(date.getDate() + i);
-    const dayCondition = conditions[(conditionIndex + i) % conditions.length];
+  const todayStr = now.toISOString().split('T')[0];
+  
+  const dailyData = Array.from(dailyMap.entries()).slice(0, 5).map(([date, items], index) => {
+    const temps = items.map((i: any) => i.main.temp);
+    const dateObj = new Date(date);
+    // Get the most common weather condition for the day
+    const midDayItem = items.find((i: any) => {
+      const hour = new Date(i.dt * 1000).getHours();
+      return hour >= 11 && hour <= 14;
+    }) || items[Math.floor(items.length / 2)];
     
     return {
-      date: date.toISOString().split('T')[0],
-      dayName: i === 0 ? 'Today' : days[date.getDay()],
-      tempMax: Math.round(baseTemp + 5 + Math.random() * 3),
-      tempMin: Math.round(baseTemp - 3 - Math.random() * 3),
-      condition: dayCondition,
-      conditionText: conditionTexts[dayCondition],
-      precipChance: Math.round(Math.random() * 100),
+      date,
+      dayName: date === todayStr ? 'Today' : days[dateObj.getDay()],
+      tempMax: Math.round(Math.max(...temps)),
+      tempMin: Math.round(Math.min(...temps)),
+      condition: mapWeatherCondition(midDayItem.weather[0].icon, midDayItem.weather[0].id),
+      conditionText: midDayItem.weather[0].description,
+      precipChance: Math.round(Math.max(...items.map((i: any) => (i.pop || 0) * 100))),
+      icon: midDayItem.weather[0].icon,
     };
   });
 
   return {
-    current: {
-      location: city,
-      country: city === 'Tokyo' ? 'Japan' : city === 'Paris' ? 'France' : city === 'Sydney' ? 'Australia' : 'USA',
-      temperature: baseTemp,
-      feelsLike: baseTemp - 2 + Math.round(Math.random() * 4),
-      condition,
-      conditionText: conditionTexts[condition],
-      humidity: 40 + Math.round(Math.random() * 40),
-      windSpeed: 5 + Math.round(Math.random() * 20),
-      pressure: 1010 + Math.round(Math.random() * 20),
-      visibility: 8 + Math.round(Math.random() * 7),
-      uvIndex: isDay ? 1 + Math.round(Math.random() * 10) : 0,
-      isDay,
-    },
+    current: currentWeather,
     hourly: hourlyData,
     daily: dailyData,
   };
@@ -96,21 +106,41 @@ export const useWeather = () => {
     setIsLoading(true);
     setError(null);
 
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1200));
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('weather', {
+        body: { action: 'weather', city },
+      });
 
-    // Mock error for unknown cities
-    if (city.toLowerCase() === 'unknown' || city.length < 2) {
-      setError('City not found. Please try again.');
+      if (fnError) throw fnError;
+      if (data.error) throw new Error(data.error);
+
+      const weatherData = parseWeatherData(data.current, data.forecast);
+      setWeather(weatherData);
+    } catch (err) {
+      console.error('Failed to fetch weather:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch weather data');
+    } finally {
       setIsLoading(false);
-      return;
     }
+  }, []);
+
+  const fetchByCoords = useCallback(async (lat: number, lon: number) => {
+    setIsLoading(true);
+    setError(null);
 
     try {
-      const data = generateMockWeather(city);
-      setWeather(data);
+      const { data, error: fnError } = await supabase.functions.invoke('weather', {
+        body: { action: 'weather', lat, lon },
+      });
+
+      if (fnError) throw fnError;
+      if (data.error) throw new Error(data.error);
+
+      const weatherData = parseWeatherData(data.current, data.forecast);
+      setWeather(weatherData);
     } catch (err) {
-      setError('Failed to fetch weather data.');
+      console.error('Failed to fetch weather by coords:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch weather data');
     } finally {
       setIsLoading(false);
     }
@@ -128,25 +158,61 @@ export const useWeather = () => {
         });
       });
 
-      // In a real app, we'd reverse geocode. For demo, use a mock city
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const mockCities = ['San Francisco', 'New York', 'London', 'Tokyo', 'Sydney'];
-      const randomCity = mockCities[Math.floor(Math.random() * mockCities.length)];
-      
-      const data = generateMockWeather(randomCity);
-      setWeather(data);
+      await fetchByCoords(position.coords.latitude, position.coords.longitude);
     } catch (err) {
+      console.error('Location error:', err);
       setError('Unable to get your location. Please enable location services.');
-    } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [fetchByCoords]);
 
   return {
     weather,
     isLoading,
     error,
     fetchWeather,
+    fetchByCoords,
     fetchByLocation,
+  };
+};
+
+export const useCitySearch = () => {
+  const [suggestions, setSuggestions] = useState<CitySearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  const searchCities = useCallback(async (query: string) => {
+    if (query.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
+    setIsSearching(true);
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('weather', {
+        body: { action: 'search', city: query },
+      });
+
+      if (fnError) throw fnError;
+      if (data.error) throw new Error(data.error);
+
+      setSuggestions(data.cities || []);
+    } catch (err) {
+      console.error('City search error:', err);
+      setSuggestions([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  const clearSuggestions = useCallback(() => {
+    setSuggestions([]);
+  }, []);
+
+  return {
+    suggestions,
+    isSearching,
+    searchCities,
+    clearSuggestions,
   };
 };

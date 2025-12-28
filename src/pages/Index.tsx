@@ -9,12 +9,16 @@ import ThemeToggle from '@/components/weather/ThemeToggle';
 import UnitToggle from '@/components/weather/UnitToggle';
 import LoadingSkeleton from '@/components/weather/LoadingSkeleton';
 import ErrorDisplay from '@/components/weather/ErrorDisplay';
-import { useWeather } from '@/hooks/useWeather';
+import FavoritesBar from '@/components/weather/FavoritesBar';
+import { useWeather, useCitySearch } from '@/hooks/useWeather';
 import { useTheme } from '@/hooks/useTheme';
-import type { TemperatureUnit } from '@/types/weather';
+import { useFavorites } from '@/hooks/useFavorites';
+import type { TemperatureUnit, CitySearchResult, FavoriteCity } from '@/types/weather';
 
 const Index = () => {
-  const { weather, isLoading, error, fetchWeather, fetchByLocation } = useWeather();
+  const { weather, isLoading, error, fetchWeather, fetchByCoords, fetchByLocation } = useWeather();
+  const { suggestions, isSearching, searchCities, clearSuggestions } = useCitySearch();
+  const { favorites, addFavorite, removeFavorite, isFavorite } = useFavorites();
   const { isDark, toggleTheme } = useTheme();
   const [unit, setUnit] = useState<TemperatureUnit>('celsius');
   const hasInitialized = useRef(false);
@@ -29,6 +33,16 @@ const Index = () => {
 
   const handleSearch = (city: string) => {
     fetchWeather(city);
+    clearSuggestions();
+  };
+
+  const handleSelectCity = (city: CitySearchResult) => {
+    fetchByCoords(city.lat, city.lon);
+    clearSuggestions();
+  };
+
+  const handleSelectFavorite = (city: FavoriteCity) => {
+    fetchByCoords(city.lat, city.lon);
   };
 
   const handleLocationRequest = () => {
@@ -37,6 +51,24 @@ const Index = () => {
 
   const toggleUnit = () => {
     setUnit(prev => (prev === 'celsius' ? 'fahrenheit' : 'celsius'));
+  };
+
+  const handleToggleFavorite = () => {
+    if (!weather) return;
+    
+    if (isFavorite(weather.current.location, weather.current.country)) {
+      const fav = favorites.find(
+        f => f.name === weather.current.location && f.country === weather.current.country
+      );
+      if (fav) removeFavorite(fav.id);
+    } else {
+      addFavorite({
+        name: weather.current.location,
+        country: weather.current.country,
+        lat: 0, // We don't have coords from current weather, but it works for display
+        lon: 0,
+      });
+    }
   };
 
   // Default to sunny for initial background
@@ -72,11 +104,26 @@ const Index = () => {
         </header>
 
         {/* Search Bar */}
-        <div className="px-4 md:px-6 mb-8">
+        <div className="px-4 md:px-6 mb-4">
           <SearchBar
             onSearch={handleSearch}
+            onSelectCity={handleSelectCity}
             onLocationRequest={handleLocationRequest}
             isLoading={isLoading}
+            suggestions={suggestions}
+            isSearching={isSearching}
+            onQueryChange={searchCities}
+            onClearSuggestions={clearSuggestions}
+          />
+        </div>
+
+        {/* Favorites Bar */}
+        <div className="px-4 md:px-6">
+          <FavoritesBar
+            favorites={favorites}
+            onSelectCity={handleSelectFavorite}
+            onRemoveFavorite={removeFavorite}
+            currentCity={weather?.current.location}
           />
         </div>
 
@@ -99,7 +146,12 @@ const Index = () => {
                 exit={{ opacity: 0 }}
                 className="max-w-2xl mx-auto space-y-8"
               >
-                <CurrentWeather weather={weather.current} unit={unit} />
+                <CurrentWeather 
+                  weather={weather.current} 
+                  unit={unit}
+                  isFavorite={isFavorite(weather.current.location, weather.current.country)}
+                  onToggleFavorite={handleToggleFavorite}
+                />
                 <HourlyForecast forecast={weather.hourly} unit={unit} />
                 <DailyForecast forecast={weather.daily} unit={unit} />
               </motion.div>
