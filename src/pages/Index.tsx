@@ -111,7 +111,12 @@ const Index = () => {
   };
 
   const handleSelectFavorite = (city: FavoriteCity) => {
-    fetchByCoords(city.lat, city.lon);
+    // Use coordinates if available, otherwise fall back to city name
+    if (city.lat !== 0 || city.lon !== 0) {
+      fetchByCoords(city.lat, city.lon);
+    } else {
+      fetchWeather(city.name);
+    }
   };
 
   const handleLocationRequest = () => {
