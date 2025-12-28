@@ -117,6 +117,16 @@ const Index = () => {
           />
         </div>
 
+        {/* Favorites Bar */}
+        <div className="px-4 md:px-6">
+          <FavoritesBar
+            favorites={favorites}
+            onSelectCity={handleSelectFavorite}
+            onRemoveFavorite={removeFavorite}
+            currentCity={weather?.current.location}
+          />
+        </div>
+
         {/* Content Area */}
         <main className="px-4 md:px-6 pb-12">
           <AnimatePresence mode="wait">
@@ -148,14 +158,6 @@ const Index = () => {
             ) : null}
           </AnimatePresence>
         </main>
-
-        {/* Floating Favorites Bar */}
-        <FavoritesBar
-          favorites={favorites}
-          onSelectCity={handleSelectFavorite}
-          onRemoveFavorite={removeFavorite}
-          currentCity={weather?.current.location}
-        />
       </motion.div>
     </div>
   );
