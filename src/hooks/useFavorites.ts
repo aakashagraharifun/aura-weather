@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { FavoriteCity } from '@/types/weather';
+import type { FavoriteCity, WeatherCondition } from '@/types/weather';
 
 const STORAGE_KEY = 'weather-favorites';
 
@@ -51,10 +51,24 @@ export const useFavorites = () => {
     return favorites.some(f => f.name === name && f.country === country);
   }, [favorites]);
 
+  const reorderFavorites = useCallback((newOrder: FavoriteCity[]) => {
+    setFavorites(newOrder);
+  }, []);
+
+  const updateFavoriteCache = useCallback((name: string, country: string, temp: number, condition: WeatherCondition) => {
+    setFavorites(prev => prev.map(f => 
+      f.name === name && f.country === country
+        ? { ...f, cachedTemp: temp, cachedCondition: condition }
+        : f
+    ));
+  }, []);
+
   return {
     favorites,
     addFavorite,
     removeFavorite,
     isFavorite,
+    reorderFavorites,
+    updateFavoriteCache,
   };
 };

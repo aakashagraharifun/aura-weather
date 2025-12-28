@@ -9,6 +9,7 @@ interface CurrentWeatherProps {
   unit: TemperatureUnit;
   isFavorite: boolean;
   onToggleFavorite: () => void;
+  onOpenFavorites?: () => void;
 }
 
 const convertTemp = (temp: number, unit: TemperatureUnit): number => {
@@ -18,7 +19,7 @@ const convertTemp = (temp: number, unit: TemperatureUnit): number => {
   return temp;
 };
 
-const CurrentWeather = ({ weather, unit, isFavorite, onToggleFavorite }: CurrentWeatherProps) => {
+const CurrentWeather = ({ weather, unit, isFavorite, onToggleFavorite, onOpenFavorites }: CurrentWeatherProps) => {
   const temp = convertTemp(weather.temperature, unit);
   const feelsLike = convertTemp(weather.feelsLike, unit);
 
@@ -55,11 +56,18 @@ const CurrentWeather = ({ weather, unit, isFavorite, onToggleFavorite }: Current
           onClick={onToggleFavorite}
           className="p-2 rounded-full hover:bg-white/10 transition-colors"
         >
-          <Heart
-            className={`w-6 h-6 transition-colors ${
-              isFavorite ? 'text-red-400 fill-current' : 'text-white/60'
-            }`}
-          />
+          <motion.div
+            animate={isFavorite ? {
+              scale: [1, 1.3, 1],
+            } : {}}
+            transition={{ duration: 0.3 }}
+          >
+            <Heart
+              className={`w-6 h-6 transition-colors duration-300 ${
+                isFavorite ? 'text-red-400 fill-current' : 'text-white/60'
+              }`}
+            />
+          </motion.div>
         </motion.button>
       </motion.div>
 
