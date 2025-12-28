@@ -11,10 +11,13 @@ import LoadingSkeleton from '@/components/weather/LoadingSkeleton';
 import ErrorDisplay from '@/components/weather/ErrorDisplay';
 import FavoritesDrawer from '@/components/weather/FavoritesDrawer';
 import FavoritesToggle from '@/components/weather/FavoritesToggle';
+import LocationPrompt from '@/components/weather/LocationPrompt';
 import { useWeather, useCitySearch } from '@/hooks/useWeather';
 import { useTheme } from '@/hooks/useTheme';
 import { useFavorites } from '@/hooks/useFavorites';
 import type { TemperatureUnit, CitySearchResult, FavoriteCity } from '@/types/weather';
+
+const LOCATION_PERMISSION_KEY = 'weather-location-permission';
 
 const Index = () => {
   const { weather, isLoading, error, fetchWeather, fetchByCoords, fetchByLocation } = useWeather();
@@ -23,15 +26,67 @@ const Index = () => {
   const { isDark, toggleTheme } = useTheme();
   const [unit, setUnit] = useState<TemperatureUnit>('celsius');
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
+  const [locationStatus, setLocationStatus] = useState<'pending' | 'granted' | 'denied' | 'unavailable'>('pending');
   const hasInitialized = useRef(false);
 
-  // Load default city on mount
+  // Auto-detect location on mount
   useEffect(() => {
-    if (!hasInitialized.current) {
-      hasInitialized.current = true;
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
+    const savedPermission = localStorage.getItem(LOCATION_PERMISSION_KEY);
+    
+    if (savedPermission === 'granted') {
+      // User previously granted permission, try to get location
+      attemptGeolocation();
+    } else if (savedPermission === 'denied') {
+      // User previously denied, use default
+      setLocationStatus('denied');
       fetchWeather('San Francisco');
+    } else {
+      // First visit, show prompt
+      setShowLocationPrompt(true);
     }
   }, []);
+
+  const attemptGeolocation = async () => {
+    if (!navigator.geolocation) {
+      setLocationStatus('unavailable');
+      fetchWeather('San Francisco');
+      return;
+    }
+
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          timeout: 10000,
+          enableHighAccuracy: true,
+        });
+      });
+      
+      setLocationStatus('granted');
+      localStorage.setItem(LOCATION_PERMISSION_KEY, 'granted');
+      fetchByCoords(position.coords.latitude, position.coords.longitude);
+    } catch (err) {
+      console.error('Geolocation error:', err);
+      setLocationStatus('denied');
+      localStorage.setItem(LOCATION_PERMISSION_KEY, 'denied');
+      fetchWeather('San Francisco');
+    }
+  };
+
+  const handleLocationPermission = (allowed: boolean) => {
+    setShowLocationPrompt(false);
+    
+    if (allowed) {
+      attemptGeolocation();
+    } else {
+      setLocationStatus('denied');
+      localStorage.setItem(LOCATION_PERMISSION_KEY, 'denied');
+      fetchWeather('San Francisco');
+    }
+  };
 
   // Update cached weather data for current city in favorites
   useEffect(() => {
@@ -93,6 +148,14 @@ const Index = () => {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
+      {/* Location Permission Prompt */}
+      {showLocationPrompt && (
+        <LocationPrompt
+          onAllow={() => handleLocationPermission(true)}
+          onDeny={() => handleLocationPermission(false)}
+        />
+      )}
+
       {/* Animated Background */}
       <WeatherBackground condition={condition} isDay={isDay} />
 
