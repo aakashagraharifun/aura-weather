@@ -1,12 +1,14 @@
 import { motion } from 'framer-motion';
 import CountUp from 'react-countup';
-import { Droplets, Wind, Gauge, Eye } from 'lucide-react';
+import { Droplets, Wind, Gauge, Eye, Heart } from 'lucide-react';
 import type { CurrentWeather as CurrentWeatherType, TemperatureUnit } from '@/types/weather';
 import WeatherIcon from './WeatherIcon';
 
 interface CurrentWeatherProps {
   weather: CurrentWeatherType;
   unit: TemperatureUnit;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
 }
 
 const convertTemp = (temp: number, unit: TemperatureUnit): number => {
@@ -16,7 +18,7 @@ const convertTemp = (temp: number, unit: TemperatureUnit): number => {
   return temp;
 };
 
-const CurrentWeather = ({ weather, unit }: CurrentWeatherProps) => {
+const CurrentWeather = ({ weather, unit, isFavorite, onToggleFavorite }: CurrentWeatherProps) => {
   const temp = convertTemp(weather.temperature, unit);
   const feelsLike = convertTemp(weather.feelsLike, unit);
 
@@ -34,17 +36,31 @@ const CurrentWeather = ({ weather, unit }: CurrentWeatherProps) => {
       transition={{ duration: 0.6, delay: 0.3 }}
       className="text-center text-white"
     >
-      {/* Location */}
+      {/* Location with favorite button */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.4 }}
-        className="mb-2"
+        className="mb-2 flex items-center justify-center gap-2"
       >
-        <h1 className="text-2xl md:text-3xl font-semibold text-shadow-soft">
-          {weather.location}
-        </h1>
-        <p className="text-white/70 text-sm">{weather.country}</p>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-semibold text-shadow-soft">
+            {weather.location}
+          </h1>
+          <p className="text-white/70 text-sm">{weather.country}</p>
+        </div>
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={onToggleFavorite}
+          className="p-2 rounded-full hover:bg-white/10 transition-colors"
+        >
+          <Heart
+            className={`w-6 h-6 transition-colors ${
+              isFavorite ? 'text-red-400 fill-current' : 'text-white/60'
+            }`}
+          />
+        </motion.button>
       </motion.div>
 
       {/* Main Temperature */}
