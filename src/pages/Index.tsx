@@ -61,7 +61,7 @@ const Index = () => {
     } else if (savedPermission === 'denied') {
       // User previously denied, use default
       setLocationStatus('denied');
-      fetchWeather('San Francisco');
+      fetchWeather('Guwahati');
     } else {
       // First visit, show prompt
       setShowLocationPrompt(true);
@@ -70,7 +70,7 @@ const Index = () => {
   const attemptGeolocation = async () => {
     if (!navigator.geolocation) {
       setLocationStatus('unavailable');
-      fetchWeather('San Francisco');
+      fetchWeather('Guwahati');
       return;
     }
     try {
@@ -87,7 +87,7 @@ const Index = () => {
       console.error('Geolocation error:', err);
       setLocationStatus('denied');
       localStorage.setItem(LOCATION_PERMISSION_KEY, 'denied');
-      fetchWeather('San Francisco');
+      fetchWeather('Guwahati');
     }
   };
   const handleLocationPermission = (allowed: boolean) => {
@@ -97,7 +97,7 @@ const Index = () => {
     } else {
       setLocationStatus('denied');
       localStorage.setItem(LOCATION_PERMISSION_KEY, 'denied');
-      fetchWeather('San Francisco');
+      fetchWeather('Guwahati');
     }
   };
 
@@ -138,8 +138,8 @@ const Index = () => {
       addFavorite({
         name: weather.current.location,
         country: weather.current.country,
-        lat: 0,
-        lon: 0,
+        lat: weather.current.lat,
+        lon: weather.current.lon,
         cachedTemp: weather.current.temperature,
         cachedCondition: weather.current.condition
       });
@@ -206,7 +206,7 @@ const Index = () => {
         {/* Content Area */}
         <main className="px-4 md:px-6 pb-12">
           <AnimatePresence mode="wait">
-            {isLoading ? <LoadingSkeleton key="loading" /> : error ? <ErrorDisplay key="error" message={error} onRetry={() => fetchWeather('San Francisco')} /> : weather ? <motion.div key="weather" initial={{
+            {isLoading ? <LoadingSkeleton key="loading" /> : error ? <ErrorDisplay key="error" message={error} onRetry={() => fetchWeather('Guwahati')} /> : weather ? <motion.div key="weather" initial={{
             opacity: 0
           }} animate={{
             opacity: 1
