@@ -66,4 +66,6 @@ export interface FavoriteCity {
   country: string;
   lat: number;
   lon: number;
+  cachedTemp?: number;
+  cachedCondition?: WeatherCondition;
 }

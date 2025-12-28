@@ -9,7 +9,8 @@ import ThemeToggle from '@/components/weather/ThemeToggle';
 import UnitToggle from '@/components/weather/UnitToggle';
 import LoadingSkeleton from '@/components/weather/LoadingSkeleton';
 import ErrorDisplay from '@/components/weather/ErrorDisplay';
-import FavoritesBar from '@/components/weather/FavoritesBar';
+import FavoritesDrawer from '@/components/weather/FavoritesDrawer';
+import FavoritesToggle from '@/components/weather/FavoritesToggle';
 import { useWeather, useCitySearch } from '@/hooks/useWeather';
 import { useTheme } from '@/hooks/useTheme';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -18,9 +19,10 @@ import type { TemperatureUnit, CitySearchResult, FavoriteCity } from '@/types/we
 const Index = () => {
   const { weather, isLoading, error, fetchWeather, fetchByCoords, fetchByLocation } = useWeather();
   const { suggestions, isSearching, searchCities, clearSuggestions } = useCitySearch();
-  const { favorites, addFavorite, removeFavorite, isFavorite } = useFavorites();
+  const { favorites, addFavorite, removeFavorite, isFavorite, reorderFavorites, updateFavoriteCache } = useFavorites();
   const { isDark, toggleTheme } = useTheme();
   const [unit, setUnit] = useState<TemperatureUnit>('celsius');
+  const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
   const hasInitialized = useRef(false);
 
   // Load default city on mount
@@ -30,6 +32,18 @@ const Index = () => {
       fetchWeather('San Francisco');
     }
   }, []);
+
+  // Update cached weather data for current city in favorites
+  useEffect(() => {
+    if (weather) {
+      updateFavoriteCache(
+        weather.current.location,
+        weather.current.country,
+        weather.current.temperature,
+        weather.current.condition
+      );
+    }
+  }, [weather, updateFavoriteCache]);
 
   const handleSearch = (city: string) => {
     fetchWeather(city);
@@ -65,8 +79,10 @@ const Index = () => {
       addFavorite({
         name: weather.current.location,
         country: weather.current.country,
-        lat: 0, // We don't have coords from current weather, but it works for display
+        lat: 0,
         lon: 0,
+        cachedTemp: weather.current.temperature,
+        cachedCondition: weather.current.condition,
       });
     }
   };
@@ -80,6 +96,17 @@ const Index = () => {
       {/* Animated Background */}
       <WeatherBackground condition={condition} isDay={isDay} />
 
+      {/* Favorites Drawer */}
+      <FavoritesDrawer
+        isOpen={isFavoritesOpen}
+        onClose={() => setIsFavoritesOpen(false)}
+        favorites={favorites}
+        onSelectCity={handleSelectFavorite}
+        onRemoveFavorite={removeFavorite}
+        onReorderFavorites={reorderFavorites}
+        currentCity={weather?.current.location}
+      />
+
       {/* Main Content */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -89,13 +116,27 @@ const Index = () => {
       >
         {/* Header */}
         <header className="flex items-center justify-between p-4 md:p-6">
-          <motion.h1
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="text-xl font-semibold text-white text-shadow-soft"
-          >
-            Weather
-          </motion.h1>
+          <div className="flex items-center gap-3">
+            <motion.h1
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="text-xl font-semibold text-white text-shadow-soft"
+            >
+              Weather
+            </motion.h1>
+            
+            {/* Favorites Toggle Button */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              <FavoritesToggle
+                onClick={() => setIsFavoritesOpen(true)}
+                favoriteCount={favorites.length}
+              />
+            </motion.div>
+          </div>
           
           <div className="flex items-center gap-3">
             <UnitToggle unit={unit} onToggle={toggleUnit} />
@@ -104,7 +145,7 @@ const Index = () => {
         </header>
 
         {/* Search Bar */}
-        <div className="px-4 md:px-6 mb-4">
+        <div className="px-4 md:px-6 mb-6">
           <SearchBar
             onSearch={handleSearch}
             onSelectCity={handleSelectCity}
@@ -114,16 +155,6 @@ const Index = () => {
             isSearching={isSearching}
             onQueryChange={searchCities}
             onClearSuggestions={clearSuggestions}
-          />
-        </div>
-
-        {/* Favorites Bar */}
-        <div className="px-4 md:px-6">
-          <FavoritesBar
-            favorites={favorites}
-            onSelectCity={handleSelectFavorite}
-            onRemoveFavorite={removeFavorite}
-            currentCity={weather?.current.location}
           />
         </div>
 
@@ -151,6 +182,7 @@ const Index = () => {
                   unit={unit}
                   isFavorite={isFavorite(weather.current.location, weather.current.country)}
                   onToggleFavorite={handleToggleFavorite}
+                  onOpenFavorites={() => setIsFavoritesOpen(true)}
                 />
                 <HourlyForecast forecast={weather.hourly} unit={unit} />
                 <DailyForecast forecast={weather.daily} unit={unit} />
