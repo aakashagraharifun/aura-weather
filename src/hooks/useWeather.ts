@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useRateLimit } from '@/hooks/useRateLimit';
 import type { WeatherData, WeatherCondition, CitySearchResult } from '@/types/weather';
 
 // Map OpenWeatherMap icon codes to our weather conditions
@@ -103,8 +104,14 @@ export const useWeather = () => {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { consumeCall, isLimited, remainingCalls, getResetTimeRemaining } = useRateLimit();
 
   const fetchWeather = useCallback(async (city: string) => {
+    if (!consumeCall()) {
+      setError(`Rate limit reached (${remainingCalls}/10). Resets in ${getResetTimeRemaining()}`);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -124,9 +131,14 @@ export const useWeather = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [consumeCall, remainingCalls, getResetTimeRemaining]);
 
   const fetchByCoords = useCallback(async (lat: number, lon: number) => {
+    if (!consumeCall()) {
+      setError(`Rate limit reached (${remainingCalls}/10). Resets in ${getResetTimeRemaining()}`);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -146,7 +158,7 @@ export const useWeather = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [consumeCall, remainingCalls, getResetTimeRemaining]);
 
   const fetchByLocation = useCallback(async () => {
     setIsLoading(true);
@@ -172,6 +184,8 @@ export const useWeather = () => {
     weather,
     isLoading,
     error,
+    isLimited,
+    remainingCalls,
     fetchWeather,
     fetchByCoords,
     fetchByLocation,

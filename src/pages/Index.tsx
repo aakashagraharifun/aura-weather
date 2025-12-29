@@ -12,6 +12,7 @@ import ErrorDisplay from '@/components/weather/ErrorDisplay';
 import FavoritesDrawer from '@/components/weather/FavoritesDrawer';
 import FavoritesToggle from '@/components/weather/FavoritesToggle';
 import LocationPrompt from '@/components/weather/LocationPrompt';
+import LocationResetButton from '@/components/weather/LocationResetButton';
 import { useWeather, useCitySearch } from '@/hooks/useWeather';
 import { useTheme } from '@/hooks/useTheme';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -99,6 +100,18 @@ const Index = () => {
       localStorage.setItem(LOCATION_PERMISSION_KEY, 'denied');
       fetchWeather('Guwahati');
     }
+  };
+
+  const handleResetLocation = () => {
+    localStorage.removeItem(LOCATION_PERMISSION_KEY);
+    hasInitialized.current = false;
+    setShowLocationPrompt(true);
+  };
+
+  const handleChangeDefaultCity = (city: string) => {
+    localStorage.setItem(LOCATION_PERMISSION_KEY, 'denied');
+    setLocationStatus('denied');
+    fetchWeather(city);
   };
 
   // Update cached weather data for current city in favorites
@@ -193,6 +206,11 @@ const Index = () => {
           </div>
           
           <div className="flex items-center gap-3">
+            <LocationResetButton
+              onResetLocation={handleResetLocation}
+              onChangeDefault={handleChangeDefaultCity}
+              currentCity={weather?.current.location}
+            />
             <UnitToggle unit={unit} onToggle={toggleUnit} />
             <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
           </div>
